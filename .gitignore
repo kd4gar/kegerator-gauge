@@ -1,0 +1,11 @@
+# Arduino / ESP32 build output
+build/
+*.bin
+*.elf
+*.map
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
