@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="1065" viewBox="0 0 680 710" role="img">
-<title>ESP32 gauge wiring with buck converter, pressure sensor and two-wire backlight</title>
-<desc>12V supply feeds gauge I, the backlight positive lead and a 5V buck converter. The backlight negative lead and gauge GND go to common ground. Buck 5V output powers the ESP32 5V pin and the pressure sensor red wire. Sensor green signal goes through a 10k resistor to GPIO34 with an 18k resistor to ground. Gauge S goes through 22 ohms to the IRLZ44N drain with a 47uF capacitor to ground. GPIO18 drives the gate through 220 ohms with a 10k pull-down.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="1508" viewBox="0 0 680 1005" role="img">
+<title>ESP32 kegerator gauge wiring: gauge, buck converter, pressure sensor and temperature probes</title>
+<desc>12V supply feeds gauge I, the backlight positive lead and a 5V buck converter. The backlight negative lead and gauge GND go to common ground. Buck 5V output powers the ESP32 5V pin and the pressure sensor red wire. Sensor green signal goes through a 10k resistor to GPIO34 with an 18k resistor to ground. Gauge S goes through 22 ohms to the IRLZ44N drain with a 47uF capacitor to ground. GPIO18 drives the gate through 220 ohms with a 10k pull-down. Two DS18B20 probes (keg and fridge air) share one 1-Wire bus: red to ESP32 3V3, yellow data to GPIO4, black to GND, with one 4.7k pull-up from data to 3V3.</desc>
 <style>
   text { font-family: Arial, Helvetica, sans-serif; }
   .th { font-size: 14px; font-weight: bold; fill: #2C2C2A; }
@@ -16,8 +16,10 @@
   .c-teal > .th    { fill: #085041; } .c-teal > .ts   { fill: #0F6E56; }
   .c-pink > rect   { fill: #FBEAF0; stroke: #993556; stroke-width: 0.75; }
   .c-pink > .th    { fill: #72243E; } .c-pink > .ts   { fill: #993556; }
+  .c-blue > rect   { fill: #E6F1FB; stroke: #185FA5; stroke-width: 0.75; }
+  .c-blue > .th    { fill: #0C447C; } .c-blue > .ts   { fill: #185FA5; }
 </style>
-<rect x="0" y="0" width="680" height="710" fill="#FFFFFF"/>
+<rect x="0" y="0" width="680" height="1005" fill="#FFFFFF"/>
 <g class="c-gray"><rect x="40" y="40" width="120" height="90" rx="4"/><text class="th" x="100" y="90" text-anchor="middle">12V supply</text><text class="ts" x="100" y="108" text-anchor="middle">bench PSU</text></g>
 <text class="th" x="152" y="75" text-anchor="end">+</text><text class="th" x="47" y="115">−</text>
 <g class="c-gray"><rect x="190" y="100" width="150" height="110" rx="4"/><text class="th" x="282" y="150" text-anchor="middle">5V buck</text><text class="ts" x="282" y="168" text-anchor="middle">12V → 5V</text><text class="ts" x="230" y="118" text-anchor="middle">IN+</text><text class="ts" x="197" y="144">IN−</text><text class="ts" x="197" y="179">OUT−</text><text class="ts" x="310" y="202" text-anchor="middle">OUT+</text></g>
@@ -25,7 +27,7 @@
 <path d="M160 70 L490 70 M230 70 L230 100 M470 70 L470 95 L490 95" fill="none" stroke="#E24B4A" stroke-width="1.5"/>
 <circle cx="230" cy="70" r="3.5" fill="#E24B4A"/><circle cx="470" cy="70" r="3.5" fill="#E24B4A"/>
 <text class="ts" x="400" y="62" text-anchor="middle">+12V</text>
-<g class="c-purple"><rect x="60" y="300" width="160" height="140" rx="4"/><text class="th" x="140" y="372" text-anchor="middle">ESP32</text><text class="ts" x="140" y="392" text-anchor="middle">5V from buck</text><text class="th" x="100" y="318" text-anchor="middle">5V</text><text class="th" x="212" y="355" text-anchor="end">P18</text><text class="th" x="212" y="425" text-anchor="end">GND</text><text class="th" x="140" y="432" text-anchor="middle">P34</text></g>
+<g class="c-purple"><rect x="60" y="300" width="160" height="140" rx="4"/><text class="th" x="140" y="372" text-anchor="middle">ESP32</text><text class="ts" x="140" y="392" text-anchor="middle">5V from buck</text><text class="ts" x="140" y="409" text-anchor="middle">3V3 + P4 to temp probes</text><text class="th" x="100" y="318" text-anchor="middle">5V</text><text class="th" x="212" y="355" text-anchor="end">P18</text><text class="th" x="212" y="425" text-anchor="end">GND</text><text class="th" x="140" y="432" text-anchor="middle">P34</text></g>
 <g class="c-teal"><rect x="330" y="330" width="100" height="120" rx="4"/><text class="th" x="380" y="392" text-anchor="middle">IRLZ44N</text><text class="ts" x="380" y="410" text-anchor="middle">N-channel</text><text class="ts" x="386" y="347">D</text><text class="ts" x="337" y="355">G</text><text class="ts" x="386" y="443">S</text></g>
 <g class="c-pink"><rect x="60" y="540" width="140" height="90" rx="4"/><text class="th" x="130" y="596" text-anchor="middle">Pressure sensor</text><text class="ts" x="68" y="574">Red</text><text class="ts" x="140" y="556" text-anchor="middle">Green</text><text class="ts" x="130" y="622" text-anchor="middle">Black</text></g>
 <path d="M310 210 L310 250 L44 250 L44 570 L60 570 M100 250 L100 300" fill="none" stroke="#7F77DD" stroke-width="1.5"/>
@@ -53,10 +55,27 @@
 <path d="M40 110 L24 110 L24 660 L656 660 L656 110 L640 110 M640 185 L656 185 M190 140 L24 140 M190 175 L24 175" fill="none" stroke="#888780" stroke-width="1.5"/>
 <path d="M220 420 L262 420 L262 660 M130 630 L130 660 M230 540 L230 660 M305 440 L305 660 M380 450 L380 660 M460 275 L460 660" fill="none" stroke="#888780" stroke-width="1.5"/>
 <circle cx="656" cy="185" r="3.5" fill="#888780"/><circle cx="24" cy="140" r="3.5" fill="#888780"/><circle cx="24" cy="175" r="3.5" fill="#888780"/><circle cx="130" cy="660" r="3.5" fill="#888780"/><circle cx="230" cy="660" r="3.5" fill="#888780"/><circle cx="262" cy="660" r="3.5" fill="#888780"/><circle cx="305" cy="660" r="3.5" fill="#888780"/><circle cx="380" cy="660" r="3.5" fill="#888780"/><circle cx="460" cy="660" r="3.5" fill="#888780"/>
-<path d="M40 690 L64 690" stroke="#E24B4A" stroke-width="2"/><text class="ts" x="70" y="694">12V</text>
-<path d="M120 690 L144 690" stroke="#7F77DD" stroke-width="2"/><text class="ts" x="150" y="694">5V</text>
-<path d="M190 690 L214 690" stroke="#888780" stroke-width="2"/><text class="ts" x="220" y="694">Ground</text>
-<path d="M290 690 L314 690" stroke="#378ADD" stroke-width="2"/><text class="ts" x="320" y="694">Gate drive</text>
-<path d="M400 690 L424 690" stroke="#EF9F27" stroke-width="2"/><text class="ts" x="430" y="694">Sender (S)</text>
-<path d="M510 690 L534 690" stroke="#1D9E75" stroke-width="2"/><text class="ts" x="540" y="694">Sensor signal</text>
+<rect x="40" y="690" width="600" height="240" rx="6" fill="none" stroke="#B4B2A9" stroke-width="1" stroke-dasharray="5 4"/>
+<text class="th" x="52" y="712">Temperature probes</text><text class="ts" x="52" y="728">inside the fridge</text>
+<g class="c-blue"><rect x="56" y="740" width="130" height="160" rx="4"/><text class="th" x="121" y="790" text-anchor="middle">DS18B20</text><text class="ts" x="121" y="808" text-anchor="middle">keg</text><text class="ts" x="178" y="764" text-anchor="end">Red</text><text class="ts" x="178" y="824" text-anchor="end">Yellow</text><text class="ts" x="178" y="884" text-anchor="end">Black</text></g>
+<g class="c-blue"><rect x="494" y="740" width="130" height="160" rx="4"/><text class="th" x="559" y="790" text-anchor="middle">DS18B20</text><text class="ts" x="559" y="808" text-anchor="middle">fridge air</text><text class="ts" x="502" y="764">Red</text><text class="ts" x="502" y="824">Yellow</text><text class="ts" x="502" y="884">Black</text></g>
+<path d="M186 760 L494 760 M340 760 L340 740 M250 760 L250 775" fill="none" stroke="#D4537E" stroke-width="1.5"/>
+<path d="M186 820 L494 820 M400 820 L400 840 M250 805 L250 820" fill="none" stroke="#639922" stroke-width="1.5"/>
+<path d="M186 880 L494 880 M340 880 L340 896" fill="none" stroke="#888780" stroke-width="1.5"/>
+<rect class="box" x="243" y="775" width="14" height="30" rx="2"/>
+<text class="ts" x="263" y="794">4.7k</text>
+<circle cx="250" cy="760" r="3.5" fill="#D4537E"/><circle cx="340" cy="760" r="3.5" fill="#D4537E"/>
+<circle cx="250" cy="820" r="3.5" fill="#639922"/><circle cx="400" cy="820" r="3.5" fill="#639922"/>
+<circle cx="340" cy="880" r="3.5" fill="#888780"/>
+<rect class="box" x="290" y="720" width="100" height="20" rx="10"/><text class="ts" x="340" y="734" text-anchor="middle">to ESP32 3V3</text>
+<rect class="box" x="350" y="840" width="100" height="20" rx="10"/><text class="ts" x="400" y="854" text-anchor="middle">to ESP32 P4</text>
+<rect class="box" x="290" y="896" width="100" height="20" rx="10"/><text class="ts" x="340" y="910" text-anchor="middle">to ESP32 GND</text>
+<path d="M40 960 L64 960" stroke="#E24B4A" stroke-width="2"/><text class="ts" x="70" y="964">12V</text>
+<path d="M120 960 L144 960" stroke="#7F77DD" stroke-width="2"/><text class="ts" x="150" y="964">5V</text>
+<path d="M190 960 L214 960" stroke="#888780" stroke-width="2"/><text class="ts" x="220" y="964">Ground</text>
+<path d="M290 960 L314 960" stroke="#378ADD" stroke-width="2"/><text class="ts" x="320" y="964">Gate drive</text>
+<path d="M400 960 L424 960" stroke="#EF9F27" stroke-width="2"/><text class="ts" x="430" y="964">Sender (S)</text>
+<path d="M510 960 L534 960" stroke="#1D9E75" stroke-width="2"/><text class="ts" x="540" y="964">Sensor signal</text>
+<path d="M40 985 L64 985" stroke="#D4537E" stroke-width="2"/><text class="ts" x="70" y="989">3.3V</text>
+<path d="M120 985 L144 985" stroke="#639922" stroke-width="2"/><text class="ts" x="150" y="989">1-Wire data</text>
 </svg>
