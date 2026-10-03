@@ -86,9 +86,11 @@ needle.style.transformOrigin = CX + 'px ' + CY + 'px';
 needle.style.transition = 'transform 0.6s ease-out';
 needle.style.transform = `rotate(${ang(0)}deg)`;
 
-function temp(id, f) {
+// f: reading or null; assigned: role has a probe; found: probes on the bus
+function temp(id, f, assigned, found) {
+  let msg = assigned ? 'probe offline' : (found ? 'not assigned' : 'no probe');
   document.getElementById(id).innerHTML =
-    f === null ? '<span class="na">no probe</span>' : f.toFixed(1) + '&deg;F';
+    f === null ? '<span class="na">' + msg + '</span>' : f.toFixed(1) + '&deg;F';
 }
 
 let lastOk = 0;
@@ -102,8 +104,8 @@ function poll() {
       document.getElementById('psi').innerHTML = d.psi.toFixed(1) + '<small> psi</small>';
       needle.style.transform = `rotate(${ang(d.psi)}deg)`;
     }
-    temp('keg', d.kegF);
-    temp('air', d.airF);
+    temp('keg', d.kegF, d.kegSet, d.probes.length);
+    temp('air', d.airF, d.airSet, d.probes.length);
     document.getElementById('status').textContent =
       d.rssi ? 'Wi-Fi ' + d.rssi + ' dBm' : 'Wi-Fi --';
   }).catch(() => {});
@@ -161,6 +163,14 @@ const char CONFIG_HTML[] PROGMEM = R"HTML(<!doctype html>
 </div>
 
 <div class="card">
+  <h2>Temperature probes</h2>
+  <div class="small">Hold one probe in your hand - the reading that rises is that probe.
+    Then pick Keg or Air for it.</div>
+  <div id="probes" class="small" style="margin-top:8px">searching...</div>
+  <div id="pmsg" class="small" style="color:#8fd18f;margin-top:6px"></div>
+</div>
+
+<div class="card">
   <h2>System</h2>
   <table>
     <tr><td>Firmware</td><td id="build">--</td></tr>
@@ -194,7 +204,33 @@ function poll() {
     set('wifi', d.ssid + (d.rssi ? ' (' + d.rssi + ' dBm)' : ''));
     set('ip', d.ip);
     set('heap', Math.round(d.heap / 1024) + ' KB');
+    showProbes(d.probes);
   }).catch(() => {});
+}
+// Rebuild the probe list only when it changes, so buttons stay clickable.
+let probeKey = '';
+function showProbes(list) {
+  const key = list.map(p => p.id + p.role).join();
+  if (!list.length) { probeKey = ''; set('probes', 'No probes found - check wiring.'); return; }
+  if (key !== probeKey) {
+    probeKey = key;
+    document.getElementById('probes').innerHTML = list.map(p => {
+      const btn = (r, label) => `<button style="width:auto;padding:6px 12px;font-size:14px;` +
+        `margin:4px 4px 0 0;${p.role === r ? 'background:#2e9d4a' : ''}" ` +
+        `onclick="assign('${p.id}','${p.role === r ? 'none' : r}')">${label}</button>`;
+      return `<div style="padding:6px 0;border-top:1px solid #333">` +
+        `<span style="font-family:monospace">${p.id}</span> ` +
+        `<b id="t${p.id}" style="font-size:18px;color:#eee"></b><br>` +
+        btn('keg', 'Keg') + btn('air', 'Air') + `</div>`;
+    }).join('');
+  }
+  list.forEach(p => {
+    document.getElementById('t' + p.id).textContent = p.f === null ? 'no reading' : p.f.toFixed(1) + ' °F';
+  });
+}
+function assign(id, role) {
+  fetch('/probe?id=' + id + '&role=' + role, { method: 'POST' })
+    .then(r => r.text()).then(t => { set('pmsg', t); poll(); });
 }
 function post(url) {
   fetch(url, { method: 'POST' }).then(r => r.text()).then(t => set('msg', t));

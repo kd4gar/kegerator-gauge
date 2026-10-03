@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="840" viewBox="0 0 680 560" role="img">
+<title>Kegerator wiring harness: nine color-coded wires from the box on top of the fridge</title>
+<desc>Nine stranded automotive wires run from the electronics box on top of the fridge, down the gap on the right side, through a hole in the right side wall. Gauge: red +12V to I, black S line to S, pink +5V to lamp plus, brown ground to GND with a jumper to lamp minus. Pressure sensor: purple +5V to red, green signal to green, brown sensor ground to black. Two DS18B20 probes in parallel: the same brown sensor ground to their black wires, blue 3V3 to red, grey P4 data to yellow. The 4.7k pull-up, 10k/18k divider, 22 ohm and 47uF stay in the box.</desc>
+<style>
+  text { font-family: Arial, Helvetica, sans-serif; }
+  .th { font-size: 14px; font-weight: bold; fill: #2C2C2A; }
+  .ts { font-size: 12px; fill: #5F5E5A; }
+  .wl { font-size: 11px; fill: #444441; }
+  .c-purple > rect { fill: #EEEDFE; stroke: #534AB7; stroke-width: 0.75; }
+  .c-purple > .th  { fill: #3C3489; } .c-purple > .ts { fill: #534AB7; }
+  .c-coral > rect  { fill: #FAECE7; stroke: #993C1D; stroke-width: 0.75; }
+  .c-coral > .th   { fill: #712B13; } .c-coral > .ts  { fill: #993C1D; }
+  .c-pink > rect   { fill: #FBEAF0; stroke: #993556; stroke-width: 0.75; }
+  .c-pink > .th    { fill: #72243E; } .c-pink > .ts   { fill: #993556; }
+  .c-blue > rect   { fill: #E6F1FB; stroke: #185FA5; stroke-width: 0.75; }
+  .c-blue > .th    { fill: #0C447C; } .c-blue > .ts   { fill: #185FA5; }
+</style>
+<rect x="0" y="0" width="680" height="560" fill="#FFFFFF"/>
+
+<text class="ts" x="125" y="40" text-anchor="middle">TOP OF FRIDGE</text>
+<text class="ts" x="560" y="40" text-anchor="middle">INSIDE THE FRIDGE</text>
+<path d="M370 50 L370 485" fill="none" stroke="#B4B2A9" stroke-width="1.5" stroke-dasharray="6 5"/>
+<text class="ts" x="370" y="40" text-anchor="middle">hole, right side wall</text>
+
+<g class="c-purple"><rect x="40" y="56" width="170" height="424" rx="4"/>
+  <text class="th" x="52" y="78">Electronics box</text>
+  <text class="ts" x="202" y="94" text-anchor="end">+12V</text>
+  <text class="ts" x="202" y="124" text-anchor="end">22Ω → MOSFET drain</text>
+  <text class="ts" x="202" y="154" text-anchor="end">+5V</text>
+  <text class="ts" x="202" y="184" text-anchor="end">GND (12V supply −)</text>
+  <text class="ts" x="202" y="264" text-anchor="end">+5V</text>
+  <text class="ts" x="202" y="294" text-anchor="end">10k → P34 divider</text>
+  <text class="ts" x="202" y="324" text-anchor="end">GND (ESP32)</text>
+  <text class="ts" x="202" y="414" text-anchor="end">3V3</text>
+  <text class="ts" x="202" y="444" text-anchor="end">P4</text>
+</g>
+
+<g class="c-coral"><rect x="490" y="62" width="150" height="142" rx="4"/>
+  <text class="th" x="498" y="94">I</text>
+  <text class="th" x="498" y="124">S</text>
+  <text class="th" x="498" y="154">Lamp +</text>
+  <text class="th" x="498" y="184">GND</text>
+  <text class="ts" x="632" y="94" text-anchor="end">Gauge</text>
+  <text class="ts" x="632" y="198" text-anchor="end">jumper → Lamp −</text>
+</g>
+<g class="c-pink"><rect x="490" y="242" width="150" height="96" rx="4"/>
+  <text class="th" x="498" y="264">red</text>
+  <text class="th" x="498" y="294">green</text>
+  <text class="th" x="498" y="324">black</text>
+  <text class="ts" x="632" y="282" text-anchor="end">Pressure</text>
+  <text class="ts" x="632" y="298" text-anchor="end">sensor</text>
+</g>
+<g class="c-blue"><rect x="490" y="362" width="150" height="96" rx="4"/>
+  <text class="th" x="498" y="384">black</text>
+  <text class="th" x="498" y="414">red</text>
+  <text class="th" x="498" y="444">yellow</text>
+  <text class="ts" x="632" y="402" text-anchor="end">2× DS18B20</text>
+  <text class="ts" x="632" y="418" text-anchor="end">in parallel</text>
+</g>
+
+<path d="M210 90 L490 90" stroke="#E24B4A" stroke-width="3"/>
+<path d="M210 120 L490 120" stroke="#2C2C2A" stroke-width="3"/>
+<path d="M210 150 L490 150" stroke="#ED93B1" stroke-width="3"/>
+<path d="M210 180 L490 180" stroke="#8B5A2B" stroke-width="3"/>
+<path d="M210 260 L490 260" stroke="#7F77DD" stroke-width="3"/>
+<path d="M210 290 L490 290" stroke="#3B9C3B" stroke-width="3"/>
+<path d="M210 320 L490 320 M450 320 L450 380 L490 380" fill="none" stroke="#8B5A2B" stroke-width="3"/>
+<circle cx="450" cy="320" r="4.5" fill="#8B5A2B"/>
+<path d="M210 410 L490 410" stroke="#378ADD" stroke-width="3"/>
+<path d="M210 440 L490 440" stroke="#8A8A8A" stroke-width="3"/>
+
+<text class="wl" x="290" y="84" text-anchor="middle">1 red</text>
+<text class="wl" x="290" y="114" text-anchor="middle">2 black</text>
+<text class="wl" x="290" y="144" text-anchor="middle">3 pink</text>
+<text class="wl" x="290" y="174" text-anchor="middle">4 brown</text>
+<text class="wl" x="290" y="254" text-anchor="middle">5 purple</text>
+<text class="wl" x="290" y="284" text-anchor="middle">6 green</text>
+<text class="wl" x="290" y="314" text-anchor="middle">7 brown</text>
+<text class="wl" x="290" y="404" text-anchor="middle">8 blue</text>
+<text class="wl" x="290" y="434" text-anchor="middle">9 grey</text>
+
+<text class="ts" x="40" y="512">The 22Ω, 47µF, 10k / 18k divider and 4.7k pull-up all stay in the box.</text>
+<text class="ts" x="40" y="530">Wire 7 (brown) is spliced inside the fridge to the pressure sensor and both probes.</text>
+<text class="ts" x="40" y="548">Leave a service loop on top; clip the bundle to the fridge side in the gap.</text>
+</svg>

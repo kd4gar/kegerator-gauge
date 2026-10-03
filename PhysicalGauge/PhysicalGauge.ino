@@ -35,6 +35,7 @@
     z       -> pressure zero calibration (sensor open to air)
     k30     -> pressure span calibration at a known 30 psi
     r       -> clear saved pressure calibration (back to code defaults)
+    t       -> print temperature probes (IDs, readings, keg / air assignment)
     wifi    -> print Wi-Fi status
     wififorget -> erase saved home Wi-Fi and reboot into setup mode
     ?       -> print current state
@@ -69,6 +70,8 @@
 #include <ArduinoOTA.h>
 #include <HTTPUpdateServer.h>
 #include <Preferences.h>
+#include <OneWire.h>             // library: OneWire (Paul Stoffregen)
+#include <DallasTemperature.h>   // library: DallasTemperature (Miles Burton)
 #include "web_page.h"
 
 // ---------- Configuration ----------
@@ -111,6 +114,15 @@ const float SENSOR_V_ZERO    = 0.4695;        // sensor volts at 0 psi (open air
 const float SENSOR_V_PER_PSI = 0.07071;       // compressor at 30 psi, corrected for zero (datasheet 0.0667)
 const int   ADC_SAMPLES      = 64;            // averaged per reading to cut noise
 const unsigned long PRINT_MS = 500;           // "p" monitor print interval
+// DS18B20 temperature probes: all on one 1-Wire bus, 4.7k pull-up P4 -> 3V3.
+// Avoid GPIO12 (P12): pulled up at boot it selects the wrong flash voltage and the ESP32 will not boot.
+// Which probe is "keg" and which is "air" is chosen on /config (saved by probe ID).
+const int ONEWIRE_PIN          = 4;         // P4 (GPIO4)
+const int MAX_PROBES           = 4;
+const unsigned long TEMP_MS    = 2000;        // read all probes this often
+const unsigned long CONVERT_MS = 800;         // 12-bit conversion takes up to 750 ms
+const unsigned long RESCAN_MS  = 30000;       // look for missing probes this often
+
 const unsigned long SMOOTH_MS = 100;          // pressure sampled this often for display/gauge
 const float SMOOTH_ALPHA      = 0.2;          // smoothing: ~0.5 s to settle after a change
 const int steveTest = 42;
@@ -145,8 +157,18 @@ float sensorVZero     = SENSOR_V_ZERO;      // runtime copies, changed by z / k#
 float sensorVPerPsi   = SENSOR_V_PER_PSI;   // (loaded from flash at boot if saved)
 float smoothV         = NAN;                // smoothed sensor volts (display + gauge)
 unsigned long lastSmooth = 0;
-float kegTempF        = NAN;                // DS18B20 probes - step 3, NAN = no probe
+float kegTempF        = NAN;                // assigned probe temps, NAN = none / offline
 float airTempF        = NAN;
+
+OneWire           oneWire(ONEWIRE_PIN);
+DallasTemperature probes(&oneWire);
+DeviceAddress probeAddr[MAX_PROBES];        // probes found on the bus
+float         probeF[MAX_PROBES];           // their latest readings (NAN = bad read)
+int           probeCount = 0;
+DeviceAddress kegAddr, airAddr;             // assignments, loaded from flash
+bool          kegSet = false, airSet = false;
+bool          convertPending = false;
+unsigned long lastTempMs = 0, convertStartMs = 0, lastScanMs = 0;
 
 WebServer   server(80);
 HTTPUpdateServer httpUpdater;      // browser/curl firmware upload at /update
@@ -292,6 +314,127 @@ String calSpan(float knownPsi) {
   return msg;
 }
 
+// Number as JSON, or null when there is no valid value.
+String jnum(float f, int decimals) {
+  return isnan(f) ? String("null") : String(f, decimals);
+}
+
+// ---------- Temperature probes (DS18B20) ----------
+String addrToStr(const DeviceAddress a) {
+  char buf[17];
+  for (int i = 0; i < 8; i++) sprintf(buf + i * 2, "%02X", a[i]);
+  return String(buf);
+}
+
+bool strToAddr(const String& s, DeviceAddress a) {
+  if (s.length() != 16) return false;
+  for (int i = 0; i < 8; i++) a[i] = strtoul(s.substring(i * 2, i * 2 + 2).c_str(), nullptr, 16);
+  return true;
+}
+
+bool sameAddr(const DeviceAddress a, const DeviceAddress b) {
+  return memcmp(a, b, 8) == 0;
+}
+
+const char* roleOf(const DeviceAddress a) {
+  if (kegSet && sameAddr(a, kegAddr)) return "keg";
+  if (airSet && sameAddr(a, airAddr)) return "air";
+  return "none";
+}
+
+void loadProbeRoles() {
+  prefs.begin("temps", true);
+  kegSet = prefs.getBytes("keg", kegAddr, 8) == 8;
+  airSet = prefs.getBytes("air", airAddr, 8) == 8;
+  prefs.end();
+}
+
+// Find every DS18B20 on the bus (family code 0x28, valid CRC).
+void scanProbes() {
+  DeviceAddress a;
+  probeCount = 0;
+  oneWire.reset_search();
+  while (probeCount < MAX_PROBES && oneWire.search(a)) {
+    if (a[0] != 0x28 || OneWire::crc8(a, 7) != a[7]) continue;
+    bool dup = false;
+    for (int i = 0; i < probeCount; i++) dup |= sameAddr(probeAddr[i], a);
+    if (dup) continue;
+    memcpy(probeAddr[probeCount], a, 8);
+    probeF[probeCount] = NAN;
+    probeCount++;
+  }
+  // Only after the search: setResolution talks on the bus, and without the 'true'
+  // (skip global recalculation) it runs its own search and derails ours.
+  for (int i = 0; i < probeCount; i++) probes.setResolution(probeAddr[i], 12, true);
+  lastScanMs = millis();
+  Serial.printf("temperature probes found: %d\n", probeCount);
+  for (int i = 0; i < probeCount; i++)
+    Serial.printf("  %s  %s\n", addrToStr(probeAddr[i]).c_str(), roleOf(probeAddr[i]));
+}
+
+void setupProbes() {
+  probes.begin();
+  probes.setWaitForConversion(false);   // never block: start a conversion, read it later
+  loadProbeRoles();
+  scanProbes();
+}
+
+// Latest reading for an assigned role, or NAN if unassigned / not found / bad read.
+float tempForRole(bool set, const DeviceAddress role) {
+  if (!set) return NAN;
+  for (int i = 0; i < probeCount; i++)
+    if (sameAddr(probeAddr[i], role)) return probeF[i];
+  return NAN;
+}
+
+// Called every loop: start a conversion, then read it CONVERT_MS later. Never blocks.
+void tempLoop() {
+  unsigned long now = millis();
+  if (!convertPending) {
+    if (now - lastTempMs < TEMP_MS) return;
+    bool missing = probeCount < 2 || isnan(kegTempF) || isnan(airTempF);
+    if (missing && now - lastScanMs > RESCAN_MS) scanProbes();
+    if (probeCount == 0) { lastTempMs = now; return; }
+    probes.requestTemperatures();
+    convertPending = true;
+    convertStartMs = now;
+    return;
+  }
+  if (now - convertStartMs < CONVERT_MS) return;
+  for (int i = 0; i < probeCount; i++) {
+    float c = probes.getTempC(probeAddr[i]);
+    // -127 = no answer / CRC error, 85.0 = power-on value (no conversion happened)
+    probeF[i] = (c == DEVICE_DISCONNECTED_C || c == 85.0) ? NAN : c * 9.0 / 5.0 + 32.0;
+  }
+  kegTempF = tempForRole(kegSet, kegAddr);
+  airTempF = tempForRole(airSet, airAddr);
+  convertPending = false;
+  lastTempMs = now;
+}
+
+// role: "keg", "air" or "none". Assigning a probe to one role removes it from the other.
+String assignProbe(const String& id, const String& role) {
+  DeviceAddress a;
+  if (!strToAddr(id, a)) return "bad probe id";
+  if (role != "keg" && role != "air" && role != "none") return "bad role";
+  prefs.begin("temps", false);
+  if (kegSet && sameAddr(kegAddr, a)) { prefs.remove("keg"); kegSet = false; }
+  if (airSet && sameAddr(airAddr, a)) { prefs.remove("air"); airSet = false; }
+  if (role == "keg")      { memcpy(kegAddr, a, 8); prefs.putBytes("keg", a, 8); kegSet = true; }
+  else if (role == "air") { memcpy(airAddr, a, 8); prefs.putBytes("air", a, 8); airSet = true; }
+  prefs.end();
+  kegTempF = tempForRole(kegSet, kegAddr);
+  airTempF = tempForRole(airSet, airAddr);
+  return "probe " + id + (role == "none" ? String(" unassigned") : " set as " + role);
+}
+
+void printTemps() {
+  Serial.printf("keg=%s F  air=%s F\n", jnum(kegTempF, 1).c_str(), jnum(airTempF, 1).c_str());
+  for (int i = 0; i < probeCount; i++)
+    Serial.printf("  %s  %s F  %s\n", addrToStr(probeAddr[i]).c_str(),
+                  jnum(probeF[i], 1).c_str(), roleOf(probeAddr[i]));
+}
+
 // ---------- Wi-Fi credentials (saved in flash) ----------
 void loadWifiCreds() {
   prefs.begin("wifi", true);
@@ -364,11 +507,6 @@ String htmlEscape(const String& s) {
   return out;
 }
 
-// Number as JSON, or null when there is no valid value.
-String jnum(float f, int decimals) {
-  return isnan(f) ? String("null") : String(f, decimals);
-}
-
 const char* resetReasonText() {
   switch (esp_reset_reason()) {
     case ESP_RST_POWERON:  return "power on";
@@ -390,14 +528,21 @@ void handleData() {
   ssid.replace("\\", "\\\\");       // JSON-escape; the page shows it as plain text
   ssid.replace("\"", "\\\"");
   String ip = wifiConnected ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
-  char json[512];
+  String plist;                     // {"id":"28..","f":36.5,"role":"keg"},...
+  for (int i = 0; i < probeCount; i++) {
+    if (i) plist += ",";
+    plist += "{\"id\":\"" + addrToStr(probeAddr[i]) + "\",\"f\":" + jnum(probeF[i], 1) +
+             ",\"role\":\"" + roleOf(probeAddr[i]) + "\"}";
+  }
+  char json[1024];
   snprintf(json, sizeof(json),
            "{\"mv\":%.1f,\"v\":%.4f,\"psi\":%s,\"zero\":%.4f,\"vpp\":%.5f,"
-           "\"kegF\":%s,\"airF\":%s,"
+           "\"kegF\":%s,\"airF\":%s,\"kegSet\":%s,\"airSet\":%s,\"probes\":[%s],"
            "\"ssid\":\"%s\",\"rssi\":%d,\"ip\":\"%s\",\"uptime\":%lu,"
            "\"heap\":%u,\"reset\":\"%s\",\"build\":\"%s %s\"}",
            v * 1000.0 / DIVIDER, v, jnum(psi, 2).c_str(), sensorVZero, sensorVPerPsi,
            jnum(kegTempF, 1).c_str(), jnum(airTempF, 1).c_str(),
+           kegSet ? "true" : "false", airSet ? "true" : "false", plist.c_str(),
            ssid.c_str(), wifiConnected ? WiFi.RSSI() : 0, ip.c_str(), millis() / 1000,
            ESP.getFreeHeap(), resetReasonText(), __DATE__, __TIME__);
   server.send(200, "application/json", json);
@@ -464,6 +609,12 @@ void setupRoutes() {
   server.on("/span", HTTP_POST, [] {
     if (!requireLogin()) return;
     String m = calSpan(server.arg("psi").toFloat());
+    Serial.println(m);
+    server.send(200, "text/plain", m);
+  });
+  server.on("/probe", HTTP_POST, [] {
+    if (!requireLogin()) return;
+    String m = assignProbe(server.arg("id"), server.arg("role"));
     Serial.println(m);
     server.send(200, "text/plain", m);
   });
@@ -592,6 +743,8 @@ void handleSerial() {
     Serial.println(calSpan(s.substring(1).toFloat()));
   } else if (s == "r") {
     resetCal();
+  } else if (s == "t") {
+    printTemps();
   } else if (s == "wifi") {
     printWifiStatus();
   } else if (s == "wififorget") {
@@ -605,7 +758,7 @@ void handleSerial() {
   } else if (isDigit(s[0]) || s[0] == '-' || s[0] == '.') {
     showValue(s.toFloat());
   } else {
-    Serial.println("unknown command. Use <value>, d<duty>, s, w[ms], p, z, k<psi>, r, wifi, wififorget, ?");
+    Serial.println("unknown command. Use <value>, d<duty>, s, w[ms], p, z, k<psi>, r, t, wifi, wififorget, ?");
   }
 }
 
@@ -614,6 +767,7 @@ void setup() {
   Serial.begin(115200);
   analogSetPinAttenuation(PRESSURE_PIN, ADC_11db);   // ~0-3.1V input range
   loadCal();
+  setupProbes();
   if (WIFI_ENABLED) startNetwork();
   pwmBegin();
   pwmWrite(0);
@@ -628,7 +782,7 @@ void setup() {
   } else {
     sweep();
   }
-  Serial.println("PhysicalGauge ready. Commands: <value>, d<duty>, s, w[ms], p, z, k<psi>, r, wifi, wififorget, ?");
+  Serial.println("PhysicalGauge ready. Commands: <value>, d<duty>, s, w[ms], p, z, k<psi>, r, t, wifi, wififorget, ?");
 }
 
 void loop() {
@@ -636,6 +790,8 @@ void loop() {
   if (WIFI_ENABLED) networkLoop();
 
   unsigned long now = millis();
+
+  tempLoop();
 
   if (now - lastSmooth >= SMOOTH_MS) {
     lastSmooth = now;
