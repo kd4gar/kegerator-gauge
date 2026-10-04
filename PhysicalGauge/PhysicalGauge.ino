@@ -548,6 +548,15 @@ void handleData() {
   server.send(200, "application/json", json);
 }
 
+// Stable, minimal JSON for other programs: {"psi":12.34,"kegF":37.0,"airF":38.0}.
+// Kept separate from /data (which changes with the web pages). null = no valid reading.
+void handleApi() {
+  float psi = voltsToPsi(isnan(smoothV) ? readSensorVolts() : smoothV);
+  String json = "{\"psi\":" + jnum(psi, 2) + ",\"kegF\":" + jnum(kegTempF, 1) +
+                ",\"airF\":" + jnum(airTempF, 1) + "}";
+  server.send(200, "application/json", json);
+}
+
 // Config pages and actions use the same login as /update.
 bool requireLogin() {
   if (server.authenticate(OTA_USER, OTA_PASS)) return true;
@@ -600,6 +609,7 @@ void setupRoutes() {
     if (requireLogin()) server.send_P(200, "text/html", CONFIG_HTML);
   });
   server.on("/data", HTTP_GET, handleData);
+  server.on("/api", HTTP_GET, handleApi);
   server.on("/zero", HTTP_POST, [] {
     if (!requireLogin()) return;
     String m = calZero();

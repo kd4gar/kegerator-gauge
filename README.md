@@ -131,9 +131,21 @@ working without Wi-Fi.
 | `/config` | Login | Live sensor readings, zero / span calibration, probe assignment, system info |
 | `/wifi` | Login | Change the home network |
 | `/update` | Login | Upload a firmware `.bin` |
-| `/data` | Open | All live values as JSON |
+| `/data` | Open | All live values as JSON (internal, changes with the web pages) |
+| `/api` | Open | Stable JSON for other programs (see below) |
 
 The login is user `OTA_USER` with password `OTA_PASS`, both set near the top of the sketch.
+
+### API
+
+`GET http://kegerator.local/api` returns:
+
+```json
+{"psi":12.34,"kegF":37.0,"airF":38.0}
+```
+
+Any value is `null` when there's no valid reading (sensor fault, probe unassigned or offline).
+Pressure is smoothed over about half a second. Temperatures update every 2 seconds.
 
 ### Updating over Wi-Fi (OTA)
 
