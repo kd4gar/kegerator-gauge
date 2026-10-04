@@ -101,8 +101,9 @@ function poll() {
     if (d.psi === null) {
       document.getElementById('psi').innerHTML = 'sensor fault';
     } else {
-      document.getElementById('psi').innerHTML = d.psi.toFixed(1) + '<small> psi</small>';
-      needle.style.transform = `rotate(${ang(d.psi)}deg)`;
+      const psi = Math.max(0, d.psi);   // never show negative here (config page shows raw)
+      document.getElementById('psi').innerHTML = psi.toFixed(1) + '<small> psi</small>';
+      needle.style.transform = `rotate(${ang(psi)}deg)`;
     }
     temp('keg', d.kegF, d.kegSet, d.probes.length);
     temp('air', d.airF, d.airSet, d.probes.length);
